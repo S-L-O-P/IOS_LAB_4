@@ -3,36 +3,32 @@
 
 #define SetBit(reg, bita) reg |= (1 << bita)
 
-#define SYNC_BYTE 0x5A        // синхробайт начала пакета (слайд 16)
-#define MAX_DATA  255         // поле длины 1 байт => максимум 255 байт данных
-#define BMP_CS    10          // CS датчика (hardware SPI: SCK=13, MISO=12, MOSI=11)
+#define SYNC_BYTE 0x5A
+#define MAX_DATA 255
+#define BMP_CS 10          // CS датчика (hardware SPI: SCK=13, MISO=12, MOSI=11)
 
 Adafruit_BMP280 bmp(BMP_CS);  // BMP280 на аппаратном SPI
 
-// --- Состояния конечного автомата разбора потока ---------------------------
 enum RxState { S_SYNC, S_LEN, S_DATA, S_CRC };
 
 volatile RxState rxState = S_SYNC;  // текущее состояние приёмника
-volatile uint8_t rxData[MAX_DATA];  // буфер принимаемых данных
-volatile uint8_t rxLen = 0;         // ожидаемая длина данных (из поля len)
-volatile uint8_t rxIdx = 0;         // сколько байт данных уже принято
+volatile uint8_t rxData[MAX_DATA]; // буфер принимаемых данных
+volatile uint8_t rxLen = 0; // ожидаемая длина данных (из поля len)
+volatile uint8_t rxIdx = 0; // сколько байт данных уже принято
 
-// Очередь на отправку валидного пакета обратно (заполняется в ISR, шлётся в loop)
-volatile bool    packetReady = false;
+volatile bool packetReady = false;
 volatile uint8_t outData[MAX_DATA];
 volatile uint8_t outLen = 0;
 
-unsigned long lastSensorMs = 0;     // момент последней отправки данных датчика
+unsigned long lastSensorMs = 0;
 
-// CRC8 (полином 0x07, init 0x00) — считается по байтам [len + data].
-// ВАЖНО: тот же алгоритм должен быть в клиенте на ПК, иначе пакеты не сойдутся.
 uint8_t crc8(uint8_t len, volatile uint8_t *data) {
   uint8_t crc = 0x00;
-  crc ^= len;                                   // включаем байт длины
+  crc ^= len;
   for (uint8_t i = 0; i < 8; i++)
     crc = (crc & 0x80) ? (crc << 1) ^ 0x07 : (crc << 1);
 
-  for (uint8_t b = 0; b < len; b++) {           // включаем байты данных
+  for (uint8_t b = 0; b < len; b++) {
     crc ^= data[b];
     for (uint8_t i = 0; i < 8; i++)
       crc = (crc & 0x80) ? (crc << 1) ^ 0x07 : (crc << 1);
@@ -40,8 +36,7 @@ uint8_t crc8(uint8_t len, volatile uint8_t *data) {
   return crc;
 }
 
-// Отправить один байт: ждём освобождения буфера передатчика (UDRE0 в UCSR0A,
-// стр. 159), затем пишем в регистр данных UDR0 (стр. 159) — это запускает передачу.
+// ждём освобождения буфера передатчика (UDRE0 в UCSR0A стр. 159), затем пишем в регистр данных UDR0 (стр. 159) — это запускает передачу.
 void uartSendByte(uint8_t b) {
   while (!(UCSR0A & (1 << UDRE0)));
   UDR0 = b;
@@ -49,11 +44,11 @@ void uartSendByte(uint8_t b) {
 
 // Собрать и отправить пакет: S | len | data | CRC8
 void uartSendPacket(volatile uint8_t *data, uint8_t len) {
-  uartSendByte(SYNC_BYTE);            // синхробайт
-  uartSendByte(len);                  // длина
-  for (uint8_t i = 0; i < len; i++)   // данные
+  uartSendByte(SYNC_BYTE); // синхробайт
+  uartSendByte(len); // длина
+  for (uint8_t i = 0; i < len; i++) // данные
     uartSendByte(data[i]);
-  uartSendByte(crc8(len, data));      // контрольная сумма
+  uartSendByte(crc8(len, data)); // контрольная сумма
 }
 
 void setup() {
@@ -73,19 +68,14 @@ void setup() {
   SetBit(UCSR0C, USBS0); // 2 стоп-бита стр. 161
 
   bmp.begin(); // инициализация датчика
-  bmp.setSampling(Adafruit_BMP280::MODE_NORMAL, // режим непрерывных измерений
-                  Adafruit_BMP280::SAMPLING_X2, // передискретизация температуры
-                  Adafruit_BMP280::SAMPLING_X16, // передискретизация давления
-                  Adafruit_BMP280::FILTER_X16, // фильтрация
-                  Adafruit_BMP280::STANDBY_MS_500);
 }
 
-// Прерывание "приём завершён" — конечный автомат разбора потока на пакеты
+// Interrupt Service Routine
 ISR(USART_RX_vect) {
-  uint8_t byte = UDR0;  // прочитать принятый байт (UDR0, стр. 159)
+  uint8_t byte = UDR0;  // прочитать принятый байт стр. 159
 
   switch (rxState) {
-    case S_SYNC:  // ждём синхробайт; всё прочее игнорируем
+    case S_SYNC:
       if (byte == SYNC_BYTE) rxState = S_LEN;
       break;
 
@@ -100,7 +90,7 @@ ISR(USART_RX_vect) {
       if (rxIdx >= rxLen) rxState = S_CRC;
       break;
 
-    case S_CRC:   // последний байт — контрольная сумма
+    case S_CRC:   // последний байт - контрольная сумма
       // принят валидный пакет и предыдущий уже отправлен -> ставим в очередь эхо
       if (byte == crc8(rxLen, rxData) && !packetReady) {
         for (uint8_t i = 0; i < rxLen; i++) outData[i] = rxData[i];
@@ -113,25 +103,22 @@ ISR(USART_RX_vect) {
   }
 }
 
-// Прочитать датчик и отправить пакет с температурой и давлением.
-// Данные: 8 байт = float температура (°C) + float давление (Па), little-endian.
 void sendSensorPacket() {
   uint8_t data[8];
-  float temperature = bmp.readTemperature();  // °C
-  float pressure    = bmp.readPressure();     // Па
+  float temperature = bmp.readTemperature(); // градусы
+  float pressure = bmp.readPressure(); // Па
 
-  memcpy(&data[0], &temperature, 4);  // первые 4 байта — температура
-  memcpy(&data[4], &pressure, 4);     // следующие 4 байта — давление
+  memcpy(&data[0], &temperature, 4); // первые 4 байта - температура
+  memcpy(&data[4], &pressure, 4); // следующие 4 байта - давление
   uartSendPacket(data, 8);
 }
 
 void loop() {
-  if (packetReady) {                       // есть валидный пакет на отправку
-    uartSendPacket(outData, outLen);       // шлём его обратно на ПК (эхо)
-    packetReady = false;                   // освободить очередь
+  if (packetReady) { // есть валидный пакет на отправку
+    uartSendPacket(outData, outLen); // шлём его обратно на ПК (эхо)
+    packetReady = false; 
   }
 
-  // раз в секунду шлём данные датчика (без delay, чтобы эхо не задерживалось)
   if (millis() - lastSensorMs >= 1000) {
     lastSensorMs = millis();
     sendSensorPacket();
