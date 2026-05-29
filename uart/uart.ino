@@ -4,7 +4,7 @@
 // Ссылки на datasheet ATmega328P (раздел 19. USART0).
 
 #include <SPI.h>
-#include <Adafruit_BMP280.h>  // Library Manager -> "Adafruit BMP280"
+#include <Adafruit_BMP280NS.h>  // форк без Serial (иначе конфликт ISR USART_RX_vect)
 
 // Установить бит `bita` в регистре `reg`
 #define SetBit(reg, bita) reg |= (1 << bita)
