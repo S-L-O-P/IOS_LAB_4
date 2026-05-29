@@ -1,7 +1,6 @@
 #include <SPI.h>
 #include <Adafruit_BMP280NS.h> 
 
-// Установить бит `bita` в регистре `reg`
 #define SetBit(reg, bita) reg |= (1 << bita)
 
 #define SYNC_BYTE 0x5A        // синхробайт начала пакета (слайд 16)
@@ -60,27 +59,24 @@ void uartSendPacket(volatile uint8_t *data, uint8_t len) {
 void setup() {
   uint16_t baudRate = 38400;
   uint16_t ubrr = 16000000 / 16 / baudRate - 1;
-  UBRR0H = (unsigned char)(ubrr >> 8);  // старший байт скорости (стр. 162)
-  UBRR0L = (unsigned char)ubrr;         // младший байт скорости (стр. 162)
+  UBRR0H = (unsigned char)(ubrr >> 8);  
+  UBRR0L = (unsigned char) ubrr; // стр. 162
 
-  // --- Включение приёмника/передатчика и прерывания приёма (UCSR0B, стр. 160) -
-  SetBit(UCSR0B, TXEN0);   // разрешить передатчик
-  SetBit(UCSR0B, RXEN0);   // разрешить приёмник
-  SetBit(UCSR0B, RXCIE0);  // прерывание по завершению приёма байта
+  SetBit(UCSR0B, TXEN0);
+  SetBit(UCSR0B, RXEN0); 
+  SetBit(UCSR0B, RXCIE0); 
 
-  // --- Формат кадра (UCSR0C, стр. 160-162) ----------------------------------
-  SetBit(UCSR0C, UCSZ01);  // \ 8 бит данных (UCSZ1:0=11, Table 19-7, стр. 162)
-  SetBit(UCSR0C, UCSZ00);  // /
-  SetBit(UCSR0C, UPM01);   // \ odd parity (UPM1:0=11, Table 19-5, стр. 161)
-  SetBit(UCSR0C, UPM00);   // /
-  SetBit(UCSR0C, USBS0);   // 2 стоп-бита (USBS=1, Table 19-6, стр. 161)
+  SetBit(UCSR0C, UCSZ01); // 8 бит данных стр. 162
+  SetBit(UCSR0C, UCSZ00);  
+  SetBit(UCSR0C, UPM01); // odd parity стр. 161
+  SetBit(UCSR0C, UPM00);   
+  SetBit(UCSR0C, USBS0); // 2 стоп-бита стр. 161
 
-  // --- Датчик BMP280 по SPI -------------------------------------------------
-  bmp.begin();                                       // инициализация датчика
-  bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,      // режим непрерывных измерений
-                  Adafruit_BMP280::SAMPLING_X2,      // передискретизация температуры
-                  Adafruit_BMP280::SAMPLING_X16,     // передискретизация давления
-                  Adafruit_BMP280::FILTER_X16,       // фильтрация
+  bmp.begin(); // инициализация датчика
+  bmp.setSampling(Adafruit_BMP280::MODE_NORMAL, // режим непрерывных измерений
+                  Adafruit_BMP280::SAMPLING_X2, // передискретизация температуры
+                  Adafruit_BMP280::SAMPLING_X16, // передискретизация давления
+                  Adafruit_BMP280::FILTER_X16, // фильтрация
                   Adafruit_BMP280::STANDBY_MS_500);
 }
 

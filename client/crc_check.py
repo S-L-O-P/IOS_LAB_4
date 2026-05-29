@@ -11,18 +11,16 @@ def crc8(data):
 
 
 def main():
-    # байты пакета из аргументов: "5A 04 54 45 53 54 F5" (с 0x или без, любой регистр)
     args = " ".join(sys.argv[1:]).replace("0x", "").replace(",", " ").split()
     packet = [int(x, 16) for x in args]
 
     if len(packet) < 3:
-        print("Использование: python3 crc_check.py 5A 04 54 45 53 54 F5")
         return
 
     sync, length = packet[0], packet[1]
     data = packet[2:-1]
     crc_got = packet[-1]
-    crc_calc = crc8([length] + data)   # CRC по [длина + данные]
+    crc_calc = crc8([length] + data)
 
     print(f"Синхробайт : 0x{sync:02X}" + ("" if sync == 0x5A else "  <- ожидался 0x5A!"))
     print(f"Длина      : {length}" + ("" if length == len(data) else f"  <- данных по факту {len(data)}!"))
