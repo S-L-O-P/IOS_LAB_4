@@ -1,10 +1,5 @@
-// Лабораторная работа №4 — драйвер UART на регистрах ATmega328 (Вариант 2)
-// Формат кадра: 38400 бод, 8 бит данных, odd parity, 2 стоп-бита (8-O-2).
-// Шаг 3: приём/проверка/эхо пакетов + раз в секунду отправка данных BMP280 (SPI).
-// Ссылки на datasheet ATmega328P (раздел 19. USART0).
-
 #include <SPI.h>
-#include <Adafruit_BMP280NS.h>  // форк без Serial (иначе конфликт ISR USART_RX_vect)
+#include <Adafruit_BMP280NS.h> 
 
 // Установить бит `bita` в регистре `reg`
 #define SetBit(reg, bita) reg |= (1 << bita)
@@ -63,7 +58,6 @@ void uartSendPacket(volatile uint8_t *data, uint8_t len) {
 }
 
 void setup() {
-  // --- Скорость 38400 бод (UBRR = f_osc/(16*BAUD)-1 = 25, стр. 146 / 162) ----
   uint16_t baudRate = 38400;
   uint16_t ubrr = 16000000 / 16 / baudRate - 1;
   UBRR0H = (unsigned char)(ubrr >> 8);  // старший байт скорости (стр. 162)

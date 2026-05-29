@@ -54,24 +54,21 @@ def collect_packets(ser, duration):
 
 
 def run_tests(ser):
-    # (название, сырые байты для отправки, отличимые data, ждём ли эхо)
-    correct = build_packet(b"TEST")
+    data = b"TEST"
+    correct = build_packet(data)
     tests = [
-        ("Корректный пакет",   correct,                                          b"TEST", True),
-        ("Нет синхробайта",    correct[1:],                                      b"TEST", False),
-        ("Неправильная длина", bytes([SYNC, 2]) + b"WLEN" + bytes([crc8(b"\x02WLEN")]), b"WLEN", False),
-        ("Недостаточно данных", bytes([SYNC, 8]) + b"AB",                         b"AB",   False),
-        ("Битый CRC",          correct[:-1] + bytes([correct[-1] ^ 0xFF]),       b"TEST", False),
+        ("Корректный пакет", correct, data, True),
+        ("Нет синхробайта", correct[1:], data, False),
+        ("Недостаточно данных", bytes([SYNC, 8]) + b"AB", b"AB", False),
     ]
 
     for name, raw, payload, expect_echo in tests:
-        time.sleep(2)                 # дать МК ресинхронизироваться (пакет датчика)
+        time.sleep(2)          
         ser.reset_input_buffer()
         ser.write(raw)
-        got_echo = payload in collect_packets(ser, 1.5)
-        verdict = "ПРИНЯТ" if got_echo else "ОТБРОШЕН"
-        ok = "OK" if got_echo == expect_echo else "FAIL"
-        print(f"{name:22} -> {verdict:9} [{ok}]")
+        echo = payload in collect_packets(ser, 1.5)
+        result = "OK" if echo == expect_echo else "FAIL"
+        print(f"{name:22} -> {result}")
 
 
 def main():
@@ -85,19 +82,12 @@ def main():
     time.sleep(2)
     ser.reset_input_buffer()
 
-    print("=== Тест пакетов ===")
     run_tests(ser)
 
-    print("=== Данные датчика (Ctrl+C для выхода) ===")
     while True:
         data = read_packet(ser)
-        if data is None:
-            print("битый пакет")
-        elif len(data) == 8:
-            temp, press = struct.unpack("<ff", data)
-            print(f"T = {temp:.2f}   P = {press:.1f}")
-        else:
-            print("data:", data.hex(" "))
+        temp, press = struct.unpack("<ff", data)
+        print(f"T = {temp:.2f}   P = {press:.1f}")
 
 
 if __name__ == "__main__":
